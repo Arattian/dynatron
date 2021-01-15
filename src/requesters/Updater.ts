@@ -247,7 +247,7 @@ export class Updater extends Checker {
       );
       try {
         const response = await Promise.race([
-          this.DB.update(this[BUILD_PARAMS]() as UpdateItemInput).promise(),
+          this.DB.updateItem(this[BUILD_PARAMS]() as UpdateItemInput).promise(),
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Attributes) as any;

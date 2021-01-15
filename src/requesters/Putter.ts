@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   AttributeMap,
   DocumentClient,
   PutItemInput,
@@ -25,7 +25,7 @@ export class Putter extends Mutator {
   #ReturnValues?: ReturnValues;
 
   constructor(
-    DB: DocumentClient,
+    DB: DynamoDB,
     table: string,
     private item: DocumentClient.PutItemInputAttributeMap,
   ) {
@@ -86,7 +86,7 @@ export class Putter extends Mutator {
       );
       try {
         const response = await Promise.race([
-          this.DB.put(requestParameters).promise(),
+          this.DB.putItem(requestParameters).promise(),
           qf.wait(),
         ]);
         return (returnRawResponse ? response : requestParameters.Item) as any;

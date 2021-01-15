@@ -1,6 +1,5 @@
 import retry from "async-retry";
-import {
-  DocumentClient,
+import DynamoDB, {
   ItemList,
   TransactGetItem,
   TransactGetItemsInput,
@@ -19,7 +18,7 @@ import { Requester } from "./_requester";
 import { Getter } from "./getter";
 
 export class TransactGetter extends Requester {
-  constructor(DB: DocumentClient, table: string, private items: Getter[]) {
+  constructor(DB: DynamoDB, table: string, private items: Getter[]) {
     super(DB, table);
   }
 
@@ -70,7 +69,7 @@ export class TransactGetter extends Requester {
       );
       try {
         const response = await Promise.race([
-          this.DB.transactGet(
+          this.DB.transactGetItems(
             this[BUILD_PARAMS]() as TransactGetItemsInput,
           ).promise(),
           qf.wait(),

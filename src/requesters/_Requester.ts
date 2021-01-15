@@ -1,4 +1,4 @@
-import { DocumentClient } from "aws-sdk/clients/dynamodb";
+import DynamoDB, { DocumentClient } from "aws-sdk/clients/dynamodb";
 
 import { RequestParameters, ReturnConsumedCapacity } from "../../types/request";
 import { BUILD, BUILD_PARAMS } from "../utils/constants";
@@ -13,7 +13,7 @@ export class Requester {
   #ReturnConsumedCapacity?: ReturnConsumedCapacity;
   protected patienceRatio = 1;
 
-  constructor(protected readonly DB: DocumentClient, protected table: string) {}
+  constructor(protected readonly DB: DynamoDB, protected table: string) {}
 
   returnConsumedCapacity = (
     returnConsumedCapacity: ReturnConsumedCapacity = "TOTAL",

@@ -1,7 +1,6 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   ClientRequestToken,
-  DocumentClient,
   TransactWriteItem,
   TransactWriteItemsInput,
 } from "aws-sdk/clients/dynamodb";
@@ -25,7 +24,7 @@ export class TransactWriter extends Mutator {
   #ClientRequestToken?: ClientRequestToken;
 
   constructor(
-    DB: DocumentClient,
+    DB: DynamoDB,
     table: string,
     private items: (Checker | Putter | Deleter | Updater)[],
   ) {
@@ -124,7 +123,7 @@ export class TransactWriter extends Mutator {
       );
       try {
         const result = await Promise.race([
-          this.DB.transactWrite(
+          this.DB.transactWriteItems(
             this[BUILD_PARAMS]() as TransactWriteItemsInput,
           ).promise(),
           qf.wait(),

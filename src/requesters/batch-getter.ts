@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   BatchGetItemInput,
   BatchGetItemOutput,
   ConsistentRead,
@@ -31,11 +31,7 @@ export class BatchGetter extends Requester {
   #ConsistentRead?: ConsistentRead;
   #ProjectionExpression?: string[];
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    private keys: DocumentClient.Key[],
-  ) {
+  constructor(DB: DynamoDB, table: string, private keys: DocumentClient.Key[]) {
     super(DB, table);
     keys.forEach((key) => validateKey(key));
   }
@@ -132,7 +128,7 @@ export class BatchGetter extends Requester {
         );
         try {
           const result = await Promise.race([
-            this.DB.batchGet(parameters).promise(),
+            this.DB.batchGetItem(parameters).promise(),
             qf.wait(),
           ]);
           if (result.UnprocessedKeys?.[table]) {

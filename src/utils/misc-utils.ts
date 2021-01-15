@@ -2,30 +2,28 @@ import { AWSError, Credentials, SharedIniFileCredentials } from "aws-sdk";
 import DynamoDB, {
   AttributeMap,
   AttributeValue,
+  BinaryAttributeValue,
+  ClientConfiguration,
   DocumentClient,
+  Key,
 } from "aws-sdk/clients/dynamodb";
 import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
 import https from "https";
-import { v4 } from "uuid";
+import { nanoid } from "nanoid";
 
 import {
   DirectConnectionWithCredentials,
   DirectConnectionWithProfile,
-  DynatronDocumentClientParameters,
+  DynatronConnectionParameters,
 } from "../../types/request";
 import { LONG_MAX_LATENCY, TAKING_TOO_LONG_EXCEPTION } from "./constants";
 
-export const serializeExpressionValue = (
-  value: DocumentClient.AttributeValue,
-) => ({
-  name: `:${v4().slice(0, 8)}`,
+export const serializeExpressionValue = (value: AttributeValue) => ({
+  name: `:${nanoid()}`,
   value,
 });
 
-export const validateKey = (
-  key: DocumentClient.Key,
-  singlePropertyKey = false,
-) => {
+export const validateKey = (key: Key, singlePropertyKey = false) => {
   if (Object.keys(key).length === 0) {
     throw new Error("At least 1 property must be present in the key");
   }
@@ -59,8 +57,8 @@ export const setOfValues = (
   values:
     | string
     | number
-    | DocumentClient.binaryType
-    | (string | number | DocumentClient.binaryType)[],
+    | BinaryAttributeValue
+    | (string | number | BinaryAttributeValue)[],
 ) =>
   new DocumentClient().createSet(Array.isArray(values) ? values : [values], {
     validate: true,
@@ -83,11 +81,9 @@ export const preStringify = (attributeMap: AttributeMap) => {
 };
 
 const bootstrapDynamoDBOptions = (
-  parameters?: DynatronDocumentClientParameters,
+  parameters?: DynatronConnectionParameters,
 ) => {
-  const options: DocumentClient.DocumentClientOptions &
-    ServiceConfigurationOptions = {
-    convertEmptyValues: true,
+  const options: ClientConfiguration & ServiceConfigurationOptions = {
     maxRetries: 3,
   };
 
@@ -146,12 +142,8 @@ const bootstrapDynamoDBOptions = (
   return options;
 };
 
-export const initDB = (parameters?: DynatronDocumentClientParameters) =>
+export const initDB = (parameters?: DynatronConnectionParameters) =>
   new DynamoDB(bootstrapDynamoDBOptions(parameters));
-
-export const initDocumentClient = (
-  parameters?: DynatronDocumentClientParameters,
-) => new DocumentClient(bootstrapDynamoDBOptions(parameters));
 
 export class QuickFail {
   #timeoutReference?: NodeJS.Timeout;

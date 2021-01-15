@@ -210,7 +210,8 @@ export const serializeConditionExpression = (
     case "begins_with":
     case "contains": {
       const aPath = serializeAttributePath(condition.path);
-      const aValue = serializeExpressionValue(condition.value);
+      // TODO: fix this
+      const aValue = serializeExpressionValue(condition.value as any);
       return {
         Expression: `${condition.kind}(${aPath.expression},${aValue.name})`,
         ExpressionAttributeNames: aPath.expressionAttributeNames,

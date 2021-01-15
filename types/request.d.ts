@@ -106,13 +106,11 @@ interface LocalConnection extends ConnectionTimeout {
   profile?: string;
 }
 
-export type DynatronDocumentClientParameters =
-  | DirectConnection
-  | LocalConnection;
+export type DynatronConnectionParameters = DirectConnection | LocalConnection;
 
 export interface DynatronConstructorParameters {
   table: string;
-  clientConfigs?: DynatronDocumentClientParameters;
+  clientConfigs?: DynatronConnectionParameters;
 }
 
 type AttributeName = {

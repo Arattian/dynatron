@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   AttributeMap,
   ConsistentRead,
   DocumentClient,
@@ -26,11 +26,7 @@ export class Getter extends Requester {
   #ConsistentRead?: ConsistentRead;
   #ProjectionExpression?: string[];
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    private key: DocumentClient.Key,
-  ) {
+  constructor(DB: DynamoDB, table: string, private key: DocumentClient.Key) {
     super(DB, table);
     validateKey(key);
   }
@@ -95,7 +91,7 @@ export class Getter extends Requester {
       );
       try {
         const response = await Promise.race([
-          this.DB.get(this[BUILD_PARAMS]() as GetItemInput).promise(),
+          this.DB.getItem(this[BUILD_PARAMS]() as GetItemInput).promise(),
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Item) as any;

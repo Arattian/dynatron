@@ -2,6 +2,7 @@ import {
   ConsistentRead,
   DocumentClient,
   IndexName,
+  Key,
   PositiveIntegerObject,
 } from "aws-sdk/clients/dynamodb";
 
@@ -68,7 +69,7 @@ export class MultiGetter extends Requester {
     return this;
   };
 
-  start = (exclusiveStartKey: DocumentClient.Key | null) => {
+  start = (exclusiveStartKey: Key | null) => {
     if (exclusiveStartKey != undefined) {
       this.#ExclusiveStartKey = exclusiveStartKey;
     }

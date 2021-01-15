@@ -28,7 +28,7 @@ export class Deleter extends Checker {
       );
       try {
         const response = await Promise.race([
-          this.DB.delete(this[BUILD_PARAMS]() as DeleteItemInput).promise(),
+          this.DB.deleteItem(this[BUILD_PARAMS]() as DeleteItemInput).promise(),
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Attributes) as any;

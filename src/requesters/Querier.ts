@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   BooleanObject,
   DocumentClient,
   ItemList,
@@ -27,11 +27,7 @@ export class Querier extends MultiGetter {
   #KeyConditionExpression?: KeyCondition;
   #ScanIndexForward?: BooleanObject;
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    private key: DocumentClient.Key,
-  ) {
+  constructor(DB: DynamoDB, table: string, private key: DocumentClient.Key) {
     super(DB, table);
     validateKey(key);
   }

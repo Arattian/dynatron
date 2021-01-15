@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   BatchWriteItemInput,
   BatchWriteItemOutput,
   DocumentClient,
@@ -30,11 +30,7 @@ import { Requester } from "./_requester";
 export class BatchDeleter extends Requester {
   #ReturnItemCollectionMetrics?: ReturnItemCollectionMetrics;
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    private keys: DocumentClient.Key[],
-  ) {
+  constructor(DB: DynamoDB, table: string, private keys: DocumentClient.Key[]) {
     super(DB, table);
     keys.forEach((key) => validateKey(key));
   }
@@ -103,7 +99,7 @@ export class BatchDeleter extends Requester {
         );
         try {
           const result = await Promise.race([
-            this.DB.batchWrite(parameters).promise(),
+            this.DB.batchWriteItem(parameters).promise(),
             qf.wait(),
           ]);
           if (result.UnprocessedItems?.[table]) {

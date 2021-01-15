@@ -1,9 +1,8 @@
 import retry from "async-retry";
-import {
+import DynamoDB, {
   AttributeMap,
   BatchWriteItemInput,
   BatchWriteItemOutput,
-  DocumentClient,
   ItemList,
 } from "aws-sdk/clients/dynamodb";
 
@@ -27,11 +26,7 @@ import { Requester } from "./_requester";
 export class BatchPutter extends Requester {
   #ReturnItemCollectionMetrics?: ReturnItemCollectionMetrics;
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    private items: AttributeMap[],
-  ) {
+  constructor(DB: DynamoDB, table: string, private items: AttributeMap[]) {
     super(DB, table);
   }
 
@@ -103,7 +98,7 @@ export class BatchPutter extends Requester {
         );
         try {
           const result = await Promise.race([
-            this.DB.batchWrite(parameters).promise(),
+            this.DB.batchWriteItem(parameters).promise(),
             qf.wait(),
           ]);
           if (result.UnprocessedItems?.[table]) {

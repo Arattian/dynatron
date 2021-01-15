@@ -1,4 +1,4 @@
-import { v4 } from "uuid";
+import { nanoid } from "nanoid";
 
 import { PathElement } from "../../types/request";
 import { assertNever } from "./misc-utils";
@@ -140,7 +140,7 @@ export const serializeAttributePath = (
       `#${
         typeof attributeNamesMap[pathElement.name] === "number"
           ? attributeNamesMap[pathElement.name]
-          : v4().slice(0, 8)
+          : nanoid()
       }`;
 
     if (serializedPath !== "") {

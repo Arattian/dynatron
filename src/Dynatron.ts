@@ -25,14 +25,11 @@ import { TablesLister } from "./requesters/tables/tables-lister";
 import { TransactGetter } from "./requesters/transact-getter";
 import { TransactWriter } from "./requesters/transact-writer";
 import { Updater } from "./requesters/updater";
-import { initDB, initDocumentClient } from "./utils/misc-utils";
+import { initDB } from "./utils/misc-utils";
 
 export class Dynatron {
   protected static readonly DynamoDBs: Record<string, DynamoDB> = {};
-  protected static readonly DocumentClients: Record<
-    string,
-    DocumentClient
-  > = {};
+  protected static readonly DynamoDBV3s: Record<string, DynamoDB> = {};
 
   constructor(
     private readonly parameters: DynatronConstructorParameters,
@@ -40,63 +37,58 @@ export class Dynatron {
   ) {
     Dynatron.DynamoDBs[this.instanceId] =
       Dynatron.DynamoDBs[this.instanceId] || initDB(parameters.clientConfigs);
-    Dynatron.DocumentClients[this.instanceId] =
-      Dynatron.DocumentClients[this.instanceId] ||
-      initDocumentClient(parameters.clientConfigs);
+    Dynatron.DynamoDBV3s[this.instanceId] =
+      Dynatron.DynamoDBV3s[this.instanceId] || initDB(parameters.clientConfigs);
   }
 
   batchDelete = (keys: DocumentClient.Key[]) =>
     new BatchDeleter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       keys,
     );
 
   batchGet = (keys: DocumentClient.Key[]) =>
     new BatchGetter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       keys,
     );
 
   batchPut = (items: DocumentClient.PutItemInputAttributeMap[]) =>
     new BatchPutter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       items,
     );
 
   check = (key: DocumentClient.Key) =>
     new Checker(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       key,
     );
 
   delete = (key: DocumentClient.Key) =>
     new Deleter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       key,
     );
 
   get = (key: DocumentClient.Key) =>
-    new Getter(
-      Dynatron.DocumentClients[this.instanceId],
-      this.parameters.table,
-      key,
-    );
+    new Getter(Dynatron.DynamoDBs[this.instanceId], this.parameters.table, key);
 
   put = (item: DocumentClient.PutItemInputAttributeMap) =>
     new Putter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       item,
     );
 
   query = (...arguments_: [DocumentClient.Key] | [string, any]) =>
     new Querier(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       typeof arguments_[0] === "string"
         ? { [arguments_[0]]: arguments_[1] }
@@ -104,28 +96,25 @@ export class Dynatron {
     );
 
   scan = () =>
-    new Scanner(
-      Dynatron.DocumentClients[this.instanceId],
-      this.parameters.table,
-    );
+    new Scanner(Dynatron.DynamoDBs[this.instanceId], this.parameters.table);
 
   update = (key: DocumentClient.Key) =>
     new Updater(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       key,
     );
 
   transactGet = (items: Getter[]) =>
     new TransactGetter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       items,
     );
 
   transactWrite = (items: (Checker | Putter | Deleter | Updater)[]) =>
     new TransactWriter(
-      Dynatron.DocumentClients[this.instanceId],
+      Dynatron.DynamoDBs[this.instanceId],
       this.parameters.table,
       items,
     );

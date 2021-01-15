@@ -1,4 +1,4 @@
-import { DocumentClient } from "aws-sdk/clients/dynamodb";
+import DynamoDB, { DocumentClient } from "aws-sdk/clients/dynamodb";
 
 import { Condition } from "../../types/conditions";
 import { FullReturnValues, ReturnValues } from "../../types/request";
@@ -12,11 +12,7 @@ export class Checker extends Mutator {
   #ConditionExpression?: Condition[];
   #ReturnValues?: ReturnValues;
 
-  constructor(
-    DB: DocumentClient,
-    table: string,
-    protected key: DocumentClient.Key,
-  ) {
+  constructor(DB: DynamoDB, table: string, protected key: DocumentClient.Key) {
     super(DB, table);
     validateKey(key);
   }
