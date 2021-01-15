@@ -1,8 +1,8 @@
 export {
-  DynatronConstructorParams,
-  DynatronDocumentClientParams,
+  DynatronConstructorParameters as DynatronConstructorParams,
+  DynatronDocumentClientParameters as DynatronDocumentClientParams,
 } from "../types/request";
-export { Dynatron } from "./Dynatron";
+export { Dynatron } from "./dynatron";
 export { setOfValues, preStringify } from "./utils/misc-utils";
 
 export {

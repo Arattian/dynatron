@@ -8,6 +8,7 @@ export const serializeUpdateExpression = (
   const { expression: path, expressionAttributeNames } = serializeAttributePath(
     update.path,
   );
+  // eslint-disable-next-line unicorn/no-null
   const attributeValue = serializeExpressionValue(update["value"] ?? null);
 
   switch (update.kind) {

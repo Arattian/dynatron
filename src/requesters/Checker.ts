@@ -4,9 +4,9 @@ import { Condition } from "../../types/conditions";
 import { FullReturnValues, ReturnValues } from "../../types/request";
 import { isConditionEmptyDeep } from "../utils/condition-expression-utils";
 import { BUILD, BUILD_PARAMS } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { validateKey } from "../utils/misc-utils";
-import { Mutator } from "./_Mutator";
+import { Mutator } from "./_mutator";
 
 export class Checker extends Mutator {
   #ConditionExpression?: Condition[];
@@ -26,12 +26,12 @@ export class Checker extends Mutator {
     return this;
   };
 
-  if = (...args: (Condition | Condition[] | undefined | null)[]) => {
-    if (isConditionEmptyDeep(args)) {
+  if = (...arguments_: (Condition | Condition[] | undefined | null)[]) => {
+    if (isConditionEmptyDeep(arguments_)) {
       return this;
     }
-    this.#ConditionExpression = args.reduce((p: Condition[], c) => {
-      if (c == null) {
+    this.#ConditionExpression = arguments_.reduce((p: Condition[], c) => {
+      if (c == undefined) {
         return p;
       }
       return [...p, ...(Array.isArray(c) ? c : [c])];
@@ -52,12 +52,12 @@ export class Checker extends Mutator {
   }
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS]();
+    const requestParameters = super[BUILD_PARAMS]();
 
     return {
       Key: this.key,
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 }

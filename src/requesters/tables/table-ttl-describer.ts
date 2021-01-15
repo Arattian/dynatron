@@ -30,12 +30,12 @@ export class TableTTLDescriber {
           qf.wait(),
         ]);
         return response.TimeToLiveDescription;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

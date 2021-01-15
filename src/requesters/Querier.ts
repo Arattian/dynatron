@@ -15,13 +15,13 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters as optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import {
   isRetryableDBError,
   QuickFail,
   validateKey,
 } from "../utils/misc-utils";
-import { MultiGetter } from "./_MultiGetter";
+import { MultiGetter } from "./_multi-getter";
 
 export class Querier extends MultiGetter {
   #KeyConditionExpression?: KeyCondition;
@@ -37,7 +37,7 @@ export class Querier extends MultiGetter {
   }
 
   having = (keyCondition: KeyCondition | undefined | null) => {
-    if (keyCondition != null) {
+    if (keyCondition != undefined) {
       this.#KeyConditionExpression = keyCondition;
     }
     return this;
@@ -56,18 +56,18 @@ export class Querier extends MultiGetter {
       ...(this.#KeyConditionExpression
         ? { RawKeyConditionExpression: [this.#KeyConditionExpression] }
         : {}),
-      ...(this.#ScanIndexForward != null
+      ...(this.#ScanIndexForward != undefined
         ? { ScanIndexForward: this.#ScanIndexForward }
         : {}),
     };
   }
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS](this.key);
+    const requestParameters = super[BUILD_PARAMS](this.key);
 
     return {
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 
@@ -75,10 +75,10 @@ export class Querier extends MultiGetter {
     returnRawResponse?: U,
     disableRecursion = false,
   ): Promise<U extends true ? QueryOutput : T | undefined | null> => {
-    const params = { ...(this[BUILD_PARAMS]() as QueryInput) };
+    const parameters = { ...(this[BUILD_PARAMS]() as QueryInput) };
 
-    if (params.IndexName) {
-      delete params.ConsistentRead;
+    if (parameters.IndexName) {
+      delete parameters.ConsistentRead;
     }
     let operationCompleted = false;
     const response: QueryOutput = {};
@@ -90,13 +90,13 @@ export class Querier extends MultiGetter {
         );
         try {
           const result = await Promise.race([
-            this.DB.query(params).promise(),
+            this.DB.query(parameters).promise(),
             qf.wait(),
           ]);
-          if (result.LastEvaluatedKey == null || disableRecursion) {
+          if (result.LastEvaluatedKey == undefined || disableRecursion) {
             operationCompleted = true;
           } else {
-            params.ExclusiveStartKey = result.LastEvaluatedKey;
+            parameters.ExclusiveStartKey = result.LastEvaluatedKey;
           }
           if (result.Items) {
             response.Items = [...(response.Items || []), ...result.Items];
@@ -117,20 +117,23 @@ export class Querier extends MultiGetter {
                 (result.ConsumedCapacity?.CapacityUnits || 0);
             }
           }
-          if (params.Limit && (response.Items?.length || 0) >= params.Limit) {
-            response.Items = response.Items?.slice(0, params.Limit);
+          if (
+            parameters.Limit &&
+            (response.Items?.length || 0) >= parameters.Limit
+          ) {
+            response.Items = response.Items?.slice(0, parameters.Limit);
             response.Count = response.Items?.length || 0;
             operationCompleted = true;
           }
-          if (disableRecursion && result.LastEvaluatedKey != null) {
+          if (disableRecursion && result.LastEvaluatedKey != undefined) {
             response.LastEvaluatedKey = result.LastEvaluatedKey;
           }
-        } catch (ex) {
-          if (!isRetryableDBError(ex)) {
-            bail(ex);
+        } catch (error) {
+          if (!isRetryableDBError(error)) {
+            bail(error);
             return;
           }
-          throw ex;
+          throw error;
         } finally {
           qf.cancel();
         }

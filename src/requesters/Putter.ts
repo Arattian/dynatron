@@ -16,9 +16,9 @@ import {
   SHORT_MAX_LATENCY,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Mutator } from "./_Mutator";
+import { Mutator } from "./_mutator";
 
 export class Putter extends Mutator {
   #ConditionExpression?: Condition[];
@@ -37,12 +37,12 @@ export class Putter extends Mutator {
     return this;
   };
 
-  if = (...args: (Condition | Condition[] | undefined | null)[]) => {
-    if (isConditionEmptyDeep(args)) {
+  if = (...arguments_: (Condition | Condition[] | undefined | null)[]) => {
+    if (isConditionEmptyDeep(arguments_)) {
       return this;
     }
-    this.#ConditionExpression = args.reduce((p: Condition[], c) => {
-      if (c == null) {
+    this.#ConditionExpression = arguments_.reduce((p: Condition[], c) => {
+      if (c == undefined) {
         return p;
       }
       return [...p, ...(Array.isArray(c) ? c : [c])];
@@ -63,12 +63,12 @@ export class Putter extends Mutator {
   }
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS]();
+    const requestParameters = super[BUILD_PARAMS]();
 
     return {
       Item: this.item,
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 
@@ -78,7 +78,7 @@ export class Putter extends Mutator {
   >(
     returnRawResponse?: U,
   ): Promise<U extends true ? PutItemOutput : T | undefined | null> => {
-    const requestParams = this[BUILD_PARAMS]() as PutItemInput;
+    const requestParameters = this[BUILD_PARAMS]() as PutItemInput;
     return retry(async (bail, attempt) => {
       const qf = new QuickFail(
         attempt * SHORT_MAX_LATENCY * (this.patienceRatio || 1),
@@ -86,16 +86,16 @@ export class Putter extends Mutator {
       );
       try {
         const response = await Promise.race([
-          this.DB.put(requestParams).promise(),
+          this.DB.put(requestParameters).promise(),
           qf.wait(),
         ]);
-        return (returnRawResponse ? response : requestParams.Item) as any;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+        return (returnRawResponse ? response : requestParameters.Item) as any;
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

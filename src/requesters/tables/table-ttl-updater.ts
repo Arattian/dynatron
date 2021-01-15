@@ -1,41 +1,44 @@
 import retry from "async-retry";
-import DynamoDB, { UpdateTableInput } from "aws-sdk/clients/dynamodb";
+import DynamoDB, { UpdateTimeToLiveInput } from "aws-sdk/clients/dynamodb";
 
 import {
   BUILD_PARAMS,
-  LONG_MAX_LATENCY,
   RETRY_OPTIONS,
+  SHORT_MAX_LATENCY,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../../utils/constants";
 import { isRetryableDBError, QuickFail } from "../../utils/misc-utils";
 
-export class TableUpdater {
-  constructor(private DB: DynamoDB, private params: UpdateTableInput) {}
+export class TableTTLUpdater {
+  constructor(
+    private DB: DynamoDB,
+    private parameters: UpdateTimeToLiveInput,
+  ) {}
 
   [BUILD_PARAMS]() {
-    return { ...this.params };
+    return { ...this.parameters };
   }
 
   $execute = async () => {
     return retry(async (bail, attempt) => {
       const qf = new QuickFail(
-        attempt * LONG_MAX_LATENCY,
+        attempt * SHORT_MAX_LATENCY,
         new Error(TAKING_TOO_LONG_EXCEPTION),
       );
       try {
         const response = await Promise.race([
-          this.DB.updateTable(
-            this[BUILD_PARAMS]() as UpdateTableInput,
+          this.DB.updateTimeToLive(
+            this[BUILD_PARAMS]() as UpdateTimeToLiveInput,
           ).promise(),
           qf.wait(),
         ]);
-        return response.TableDescription;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+        return response.TimeToLiveSpecification;
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

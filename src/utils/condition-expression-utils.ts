@@ -28,9 +28,11 @@ import {
 import { serializeAttributePath } from "./attribute-path-utils";
 import { assertNever, serializeExpressionValue } from "./misc-utils";
 
-export const and = (...args: (Condition | Condition[])[]): AndCondition => ({
+export const and = (
+  ...arguments_: (Condition | Condition[])[]
+): AndCondition => ({
   kind: "AND",
-  conditions: args.reduce(
+  conditions: arguments_.reduce(
     (p: Condition[], c) => [...p, ...(Array.isArray(c) ? c : [c])],
     [],
   ),
@@ -172,9 +174,11 @@ export const notEquals = (
 });
 export const ne = notEquals;
 
-export const or = (...args: (Condition | Condition[])[]): OrCondition => ({
+export const or = (
+  ...arguments_: (Condition | Condition[])[]
+): OrCondition => ({
   kind: "OR",
-  conditions: args.reduce(
+  conditions: arguments_.reduce(
     (p: Condition[], c) => [...p, ...(Array.isArray(c) ? c : [c])],
     [],
   ),
@@ -335,19 +339,19 @@ export const serializeConditionExpression = (
 };
 
 export const isConditionEmptyDeep = (
-  args: (Condition | Condition[] | undefined | null)[],
+  arguments_: (Condition | Condition[] | undefined | null)[],
 ): boolean => {
-  return args.every((arg) => {
-    if (arg == null) {
+  return arguments_.every((argument) => {
+    if (argument == undefined) {
       return true;
     }
 
-    if (Array.isArray(arg)) {
-      return isConditionEmptyDeep(arg);
+    if (Array.isArray(argument)) {
+      return isConditionEmptyDeep(argument);
     }
 
-    if (arg.kind === "OR" || arg.kind === "AND") {
-      return isConditionEmptyDeep(arg.conditions);
+    if (argument.kind === "OR" || argument.kind === "AND") {
+      return isConditionEmptyDeep(argument.conditions);
     }
 
     return false;

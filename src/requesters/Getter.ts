@@ -14,13 +14,13 @@ import {
   SHORT_MAX_LATENCY,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import {
   isRetryableDBError,
   QuickFail,
   validateKey,
 } from "../utils/misc-utils";
-import { Requester } from "./_Requester";
+import { Requester } from "./_requester";
 
 export class Getter extends Requester {
   #ConsistentRead?: ConsistentRead;
@@ -40,12 +40,15 @@ export class Getter extends Requester {
     return this;
   };
 
-  select = (...args: (string | string[] | undefined | null)[]) => {
-    if (args.every((arg) => arg == null) || args.flat().length === 0) {
+  select = (...arguments_: (string | string[] | undefined | null)[]) => {
+    if (
+      arguments_.every((argument) => argument == undefined) ||
+      arguments_.flat().length === 0
+    ) {
       return this;
     }
 
-    args.forEach((projection) => {
+    arguments_.forEach((projection) => {
       if (typeof projection === "string") {
         projection = [projection];
       }
@@ -70,12 +73,12 @@ export class Getter extends Requester {
   }
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS]();
+    const requestParameters = super[BUILD_PARAMS]();
 
     return {
       Key: this.key,
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 
@@ -96,12 +99,12 @@ export class Getter extends Requester {
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Item) as any;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

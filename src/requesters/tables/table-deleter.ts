@@ -1,5 +1,5 @@
 import retry from "async-retry";
-import DynamoDB, { CreateTableInput } from "aws-sdk/clients/dynamodb";
+import DynamoDB, { DeleteTableInput } from "aws-sdk/clients/dynamodb";
 
 import {
   BUILD_PARAMS,
@@ -9,11 +9,11 @@ import {
 } from "../../utils/constants";
 import { isRetryableDBError, QuickFail } from "../../utils/misc-utils";
 
-export class TableCreator {
-  constructor(private DB: DynamoDB, private params: CreateTableInput) {}
+export class TableDeleter {
+  constructor(protected readonly DB: DynamoDB, protected table: string) {}
 
   [BUILD_PARAMS]() {
-    return { ...this.params };
+    return { TableName: this.table };
   }
 
   $execute = async () => {
@@ -24,18 +24,18 @@ export class TableCreator {
       );
       try {
         const response = await Promise.race([
-          this.DB.createTable(
-            this[BUILD_PARAMS]() as CreateTableInput,
+          this.DB.deleteTable(
+            this[BUILD_PARAMS]() as DeleteTableInput,
           ).promise(),
           qf.wait(),
         ]);
         return response.TableDescription;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

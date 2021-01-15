@@ -81,9 +81,9 @@ const parseAttributePath = (path: string): PathElement[] => {
         break;
       case ParserMode.LIST_INDEX_MODE:
         if (char === Character.RIGHT_BRACKET) {
-          const listIndexValue = parseInt(buffer);
-          if (!isFinite(listIndexValue)) {
-            throw new Error(
+          const listIndexValue = Number.parseInt(buffer);
+          if (!Number.isFinite(listIndexValue)) {
+            throw new TypeError(
               `Invalid array index character [${buffer}] encountered in path [${path}] at index ${
                 index - buffer.length
               } `,
@@ -96,7 +96,7 @@ const parseAttributePath = (path: string): PathElement[] => {
           buffer = "";
           mode = ParserMode.AFTER_LIST_INDEX_MODE;
         } else {
-          if (!char.match(/^\d$/)) {
+          if (!/^\d$/.test(char)) {
             throw new Error(
               `Invalid array index character [${char}] encountered in path [${path}] at index ${index} `,
             );
@@ -140,7 +140,7 @@ export const serializeAttributePath = (
       `#${
         typeof attributeNamesMap[pathElement.name] === "number"
           ? attributeNamesMap[pathElement.name]
-          : v4().substring(0, 8)
+          : v4().slice(0, 8)
       }`;
 
     if (serializedPath !== "") {

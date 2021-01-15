@@ -1,7 +1,7 @@
 import { DocumentClient } from "aws-sdk/clients/dynamodb";
 
 import { EqualsCondition } from "../../types/conditions";
-import { RequestParams } from "../../types/request";
+import { RequestParameters } from "../../types/request";
 import { RawUpdate, RawUpdateType } from "../../types/update";
 import { serializeAttributePath } from "./attribute-path-utils";
 import {
@@ -12,15 +12,17 @@ import { optimizeExpression } from "./expression-optimization-utils";
 import { serializeUpdateExpression } from "./update-expression-utils";
 
 export const convertRawProjectionExpression = (
-  requestParams: RequestParams,
+  requestParameters: RequestParameters,
 ) => {
-  const params = { ...requestParams };
+  const parameters = { ...requestParameters };
 
-  if (!params.RawProjectionExpression) {
-    return params;
+  if (!parameters.RawProjectionExpression) {
+    return parameters;
   }
 
-  const projectionObject = [...new Set(params.RawProjectionExpression || [])]
+  const projectionObject = [
+    ...new Set(parameters.RawProjectionExpression || []),
+  ]
     .map((projection) => serializeAttributePath(projection))
     .reduce(
       (
@@ -46,36 +48,38 @@ export const convertRawProjectionExpression = (
   const projectionExpressionAttributeNames =
     projectionObject?.expressionAttributeNames;
   if (
-    projectionExpression == null ||
-    projectionExpressionAttributeNames == null
+    projectionExpression == undefined ||
+    projectionExpressionAttributeNames == undefined
   ) {
-    return params;
+    return parameters;
   }
   const { Expression, ExpressionAttributeNames } = optimizeExpression(
     projectionExpression,
     projectionExpressionAttributeNames,
   );
 
-  params.ProjectionExpression = Expression;
-  delete params.RawProjectionExpression;
+  parameters.ProjectionExpression = Expression;
+  delete parameters.RawProjectionExpression;
 
-  params.ExpressionAttributeNames = params.ExpressionAttributeNames || {};
-  params.ExpressionAttributeNames = {
-    ...params.ExpressionAttributeNames,
+  parameters.ExpressionAttributeNames =
+    parameters.ExpressionAttributeNames || {};
+  parameters.ExpressionAttributeNames = {
+    ...parameters.ExpressionAttributeNames,
     ...ExpressionAttributeNames,
   };
 
-  return params;
+  return parameters;
 };
 
 export const convertRawConditionExpressions = (
-  requestParams: RequestParams,
+  requestParameters: RequestParameters,
   queryKey?: DocumentClient.Key,
 ) => {
-  const params = { ...requestParams };
+  const parameters = { ...requestParameters };
 
-  if (queryKey != null) {
-    params.RawKeyConditionExpression = params.RawKeyConditionExpression || [];
+  if (queryKey != undefined) {
+    parameters.RawKeyConditionExpression =
+      parameters.RawKeyConditionExpression || [];
 
     const partitionKeyCondition: EqualsCondition = {
       kind: "=",
@@ -83,7 +87,7 @@ export const convertRawConditionExpressions = (
       value: queryKey[Object.keys(queryKey)[0]],
     };
 
-    params.RawKeyConditionExpression.unshift(partitionKeyCondition);
+    parameters.RawKeyConditionExpression.unshift(partitionKeyCondition);
   }
 
   const expressionTypes = [
@@ -93,12 +97,12 @@ export const convertRawConditionExpressions = (
   ];
 
   expressionTypes.forEach((expressionType) => {
-    if (params[`Raw${expressionType}`]) {
+    if (parameters[`Raw${expressionType}`]) {
       const {
         Expression: ConditionExpression,
         ExpressionAttributeNames,
         ExpressionAttributeValues,
-      } = serializeConditionExpression(and(params[`Raw${expressionType}`]));
+      } = serializeConditionExpression(and(parameters[`Raw${expressionType}`]));
 
       const {
         Expression,
@@ -110,29 +114,33 @@ export const convertRawConditionExpressions = (
         ExpressionAttributeValues,
       );
 
-      params[expressionType] = Expression;
-      delete params[`Raw${expressionType}`];
+      parameters[expressionType] = Expression;
+      delete parameters[`Raw${expressionType}`];
 
-      params.ExpressionAttributeNames = params.ExpressionAttributeNames || {};
-      params.ExpressionAttributeNames = {
-        ...params.ExpressionAttributeNames,
+      parameters.ExpressionAttributeNames =
+        parameters.ExpressionAttributeNames || {};
+      parameters.ExpressionAttributeNames = {
+        ...parameters.ExpressionAttributeNames,
         ...OptimizedExpressionAttributeNames,
       };
-      params.ExpressionAttributeValues = params.ExpressionAttributeValues || {};
-      params.ExpressionAttributeValues = {
-        ...params.ExpressionAttributeValues,
+      parameters.ExpressionAttributeValues =
+        parameters.ExpressionAttributeValues || {};
+      parameters.ExpressionAttributeValues = {
+        ...parameters.ExpressionAttributeValues,
         ...OptimizedExpressionAttributeValues,
       };
     }
   });
-  return params;
+  return parameters;
 };
 
-export const convertRawUpdateExpression = (requestParams: RequestParams) => {
-  const params = { ...requestParams };
+export const convertRawUpdateExpression = (
+  requestParameters: RequestParameters,
+) => {
+  const parameters = { ...requestParameters };
 
-  if (!params.RawUpdateExpression) {
-    return params;
+  if (!parameters.RawUpdateExpression) {
+    return parameters;
   }
 
   const updateMap: { [group in RawUpdateType]?: RawUpdate[] } = {};
@@ -143,7 +151,7 @@ export const convertRawUpdateExpression = (requestParams: RequestParams) => {
     expressionAttributeValues: {},
   };
 
-  params.RawUpdateExpression.forEach((expression) => {
+  parameters.RawUpdateExpression.forEach((expression) => {
     const { Type, ...updateExpression } = serializeUpdateExpression(expression);
     updateMap[Type] = updateMap[Type] || [];
     (updateMap[Type] || []).push(updateExpression);
@@ -195,28 +203,31 @@ export const convertRawUpdateExpression = (requestParams: RequestParams) => {
     updateObject.expressionAttributeNames,
     updateObject.expressionAttributeValues,
   );
-  params.UpdateExpression = Expression;
-  delete params.RawUpdateExpression;
-  params.ExpressionAttributeNames = params.ExpressionAttributeNames || {};
-  params.ExpressionAttributeNames = {
-    ...params.ExpressionAttributeNames,
+  parameters.UpdateExpression = Expression;
+  delete parameters.RawUpdateExpression;
+  parameters.ExpressionAttributeNames =
+    parameters.ExpressionAttributeNames || {};
+  parameters.ExpressionAttributeNames = {
+    ...parameters.ExpressionAttributeNames,
     ...ExpressionAttributeNames,
   };
-  params.ExpressionAttributeValues = {
-    ...params.ExpressionAttributeValues,
+  parameters.ExpressionAttributeValues = {
+    ...parameters.ExpressionAttributeValues,
     ...ExpressionAttributeValues,
   };
 
-  return params;
+  return parameters;
 };
 
-export const cleanupEmptyExpressions = (requestParams: RequestParams) => {
-  const params = { ...requestParams };
-  if (Object.keys(params.ExpressionAttributeNames || {}).length === 0) {
-    delete params.ExpressionAttributeNames;
+export const cleanupEmptyExpressions = (
+  requestParameters: RequestParameters,
+) => {
+  const parameters = { ...requestParameters };
+  if (Object.keys(parameters.ExpressionAttributeNames || {}).length === 0) {
+    delete parameters.ExpressionAttributeNames;
   }
-  if (Object.keys(params.ExpressionAttributeValues || {}).length === 0) {
-    delete params.ExpressionAttributeValues;
+  if (Object.keys(parameters.ExpressionAttributeValues || {}).length === 0) {
+    delete parameters.ExpressionAttributeValues;
   }
-  return params;
+  return parameters;
 };

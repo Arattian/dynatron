@@ -7,7 +7,10 @@ import {
   ItemList,
 } from "aws-sdk/clients/dynamodb";
 
-import { IBatchGetItemRequestItem, RequestParams } from "../../types/request";
+import {
+  IBatchGetItemRequestItem,
+  RequestParameters,
+} from "../../types/request";
 import {
   BATCH_OPTIONS,
   BUILD,
@@ -16,13 +19,13 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import {
   isRetryableDBError,
   QuickFail,
   validateKey,
 } from "../utils/misc-utils";
-import { Requester } from "./_Requester";
+import { Requester } from "./_requester";
 
 export class BatchGetter extends Requester {
   #ConsistentRead?: ConsistentRead;
@@ -42,12 +45,15 @@ export class BatchGetter extends Requester {
     return this;
   };
 
-  select = (...args: (string | string[] | undefined | null)[]) => {
-    if (args.every((arg) => arg == null) || args.flat().length === 0) {
+  select = (...arguments_: (string | string[] | undefined | null)[]) => {
+    if (
+      arguments_.every((argument) => argument == undefined) ||
+      arguments_.flat().length === 0
+    ) {
       return this;
     }
 
-    args.forEach((projection) => {
+    arguments_.forEach((projection) => {
       if (typeof projection === "string") {
         projection = [projection];
       }
@@ -72,48 +78,49 @@ export class BatchGetter extends Requester {
   }
 
   [BUILD_PARAMS]() {
-    let requestParams = super[BUILD_PARAMS]();
+    let requestParameters = super[BUILD_PARAMS]();
 
-    if (this.table == null) {
+    if (this.table == undefined) {
       throw new Error("Table name must be provided");
     }
 
-    if (this.keys.length == 0) {
+    if (this.keys.length === 0) {
       throw new Error("At least one key must be provided");
     }
 
     const requestItems: IBatchGetItemRequestItem = {
       Keys: this.keys,
-      ...(requestParams.ConsistentRead
-        ? { ConsistentRead: requestParams.ConsistentRead }
+      ...(requestParameters.ConsistentRead
+        ? { ConsistentRead: requestParameters.ConsistentRead }
         : {}),
-      ...(requestParams.ProjectionExpression != null &&
-      requestParams.ExpressionAttributeNames != null
+      ...(requestParameters.ProjectionExpression != undefined &&
+      requestParameters.ExpressionAttributeNames != undefined
         ? {
-            ProjectionExpression: requestParams.ProjectionExpression,
-            ExpressionAttributeNames: requestParams.ExpressionAttributeNames,
+            ProjectionExpression: requestParameters.ProjectionExpression,
+            ExpressionAttributeNames:
+              requestParameters.ExpressionAttributeNames,
           }
         : {}),
     };
-    const batchParams: RequestParams = {
+    const batchParameters: RequestParameters = {
       RequestItems: { [this.table]: requestItems },
     };
-    requestParams = {
-      ...batchParams,
-      ...(requestParams.ReturnConsumedCapacity
+    requestParameters = {
+      ...batchParameters,
+      ...(requestParameters.ReturnConsumedCapacity
         ? {
-            ReturnConsumedCapacity: requestParams.ReturnConsumedCapacity,
+            ReturnConsumedCapacity: requestParameters.ReturnConsumedCapacity,
           }
         : {}),
     };
 
-    return { ...optimizeRequestParams(requestParams) };
+    return { ...optimizeRequestParameters(requestParameters) };
   }
 
-  private batchGetSegment = async (params: BatchGetItemInput) => {
+  private batchGetSegment = async (parameters: BatchGetItemInput) => {
     const response: BatchGetItemOutput = {};
 
-    const table = Object.keys(params.RequestItems)[0];
+    const table = Object.keys(parameters.RequestItems)[0];
 
     let operationCompleted = false;
 
@@ -125,11 +132,11 @@ export class BatchGetter extends Requester {
         );
         try {
           const result = await Promise.race([
-            this.DB.batchGet(params).promise(),
+            this.DB.batchGet(parameters).promise(),
             qf.wait(),
           ]);
           if (result.UnprocessedKeys?.[table]) {
-            params.RequestItems = result.UnprocessedKeys;
+            parameters.RequestItems = result.UnprocessedKeys;
           } else {
             operationCompleted = true;
           }
@@ -149,12 +156,12 @@ export class BatchGetter extends Requester {
                 (result.ConsumedCapacity[0].CapacityUnits || 0);
             }
           }
-        } catch (ex) {
-          if (!isRetryableDBError(ex)) {
-            bail(ex);
+        } catch (error) {
+          if (!isRetryableDBError(error)) {
+            bail(error);
             return;
           }
-          throw ex;
+          throw error;
         } finally {
           qf.cancel();
         }
@@ -166,28 +173,32 @@ export class BatchGetter extends Requester {
   $execute = async <T = ItemList | undefined | null, U extends boolean = false>(
     returnRawResponse?: U,
   ): Promise<U extends true ? BatchGetItemOutput : T | undefined | null> => {
-    const params = {
+    const parameters = {
       ...(this[BUILD_PARAMS]() as BatchGetItemInput),
     };
-    const table = Object.keys(params.RequestItems)[0];
-    const keys = [...params.RequestItems[table].Keys];
-    const paramsGroups: BatchGetItemInput[] = [];
-    const lighterParams: BatchGetItemInput = JSON.parse(JSON.stringify(params));
-    for (let i = 0; i < keys.length; i += BATCH_OPTIONS.GET_LIMIT) {
-      paramsGroups.push({
+    const table = Object.keys(parameters.RequestItems)[0];
+    const keys = [...parameters.RequestItems[table].Keys];
+    const parametersGroups: BatchGetItemInput[] = [];
+    const lighterParameters: BatchGetItemInput = JSON.parse(
+      JSON.stringify(parameters),
+    );
+    for (let index = 0; index < keys.length; index += BATCH_OPTIONS.GET_LIMIT) {
+      parametersGroups.push({
         RequestItems: {
           [table]: {
-            ...lighterParams.RequestItems[table],
-            Keys: keys.slice(i, i + BATCH_OPTIONS.GET_LIMIT),
+            ...lighterParameters.RequestItems[table],
+            Keys: keys.slice(index, index + BATCH_OPTIONS.GET_LIMIT),
           },
         },
       });
     }
     const allResults = await Promise.all(
-      paramsGroups.map((paramsGroup) => this.batchGetSegment(paramsGroup)),
+      parametersGroups.map((parametersGroup) =>
+        this.batchGetSegment(parametersGroup),
+      ),
     );
     const results = allResults.reduce((p, c) => {
-      if (p == null) {
+      if (p == undefined) {
         return c;
       }
       p.Responses = p.Responses || {};

@@ -11,14 +11,14 @@ import { v4 } from "uuid";
 import {
   DirectConnectionWithCredentials,
   DirectConnectionWithProfile,
-  DynatronDocumentClientParams,
+  DynatronDocumentClientParameters,
 } from "../../types/request";
 import { LONG_MAX_LATENCY, TAKING_TOO_LONG_EXCEPTION } from "./constants";
 
 export const serializeExpressionValue = (
   value: DocumentClient.AttributeValue,
 ) => ({
-  name: `:${v4().substring(0, 8)}`,
+  name: `:${v4().slice(0, 8)}`,
   value,
 });
 
@@ -39,8 +39,8 @@ export const validateKey = (
   }
 };
 
-export const assertNever = (obj: never): never => {
-  throw new Error(`Unexpected value: ${JSON.stringify(obj)}`);
+export const assertNever = (object: never): never => {
+  throw new Error(`Unexpected value: ${JSON.stringify(object)}`);
 };
 
 export const isRetryableDBError = (error: Error) =>
@@ -68,7 +68,7 @@ export const setOfValues = (
 
 export const preStringify = (attributeMap: AttributeMap) => {
   Object.entries(attributeMap).forEach(([key, value]) => {
-    if (value == null || value.constructor.name !== "Set") {
+    if (value == undefined || value.constructor.name !== "Set") {
       return;
     }
 
@@ -82,14 +82,16 @@ export const preStringify = (attributeMap: AttributeMap) => {
   return attributeMap;
 };
 
-const bootstrapDynamoDBOptions = (params?: DynatronDocumentClientParams) => {
+const bootstrapDynamoDBOptions = (
+  parameters?: DynatronDocumentClientParameters,
+) => {
   const options: DocumentClient.DocumentClientOptions &
     ServiceConfigurationOptions = {
     convertEmptyValues: true,
     maxRetries: 3,
   };
 
-  if (params == null || params?.mode === "direct") {
+  if (parameters == undefined || parameters?.mode === "direct") {
     // Experiments have shown that this is the optimal number for sockets
     const MAX_SOCKETS = 256;
 
@@ -104,52 +106,55 @@ const bootstrapDynamoDBOptions = (params?: DynatronDocumentClientParams) => {
 
     options.httpOptions = {
       agent: dynamoDBHttpsAgent,
-      timeout: params?.timeout || LONG_MAX_LATENCY + 1000,
+      timeout: parameters?.timeout || LONG_MAX_LATENCY + 1000,
     };
   }
 
-  if (params?.mode === "direct") {
-    if ((params as DirectConnectionWithProfile).profile) {
+  if (parameters?.mode === "direct") {
+    if ((parameters as DirectConnectionWithProfile).profile) {
       options.credentials = new SharedIniFileCredentials({
-        profile: (params as DirectConnectionWithProfile).profile,
+        profile: (parameters as DirectConnectionWithProfile).profile,
       });
     } else {
       options.credentials = new Credentials({
-        accessKeyId: (params as DirectConnectionWithCredentials).accessKeyId,
-        secretAccessKey: (params as DirectConnectionWithCredentials)
+        accessKeyId: (parameters as DirectConnectionWithCredentials)
+          .accessKeyId,
+        secretAccessKey: (parameters as DirectConnectionWithCredentials)
           .secretAccessKey,
       });
     }
 
-    options.region = (params as DirectConnectionWithProfile).region;
+    options.region = (parameters as DirectConnectionWithProfile).region;
   }
 
-  if (params?.mode === "local") {
-    options.endpoint = `http://${params?.host || "localhost"}:${
-      params?.port || 8000
+  if (parameters?.mode === "local") {
+    options.endpoint = `http://${parameters?.host || "localhost"}:${
+      parameters?.port || 8000
     }`;
     options.region = "localhost";
-    options.credentials = params?.profile
+    options.credentials = parameters?.profile
       ? new SharedIniFileCredentials({
-          profile: params?.profile,
+          profile: parameters?.profile,
         })
       : new Credentials({
-          accessKeyId: params?.accessKeyId || "localAwsAccessKeyId",
-          secretAccessKey: params?.secretAccessKey || "localAwsSecretAccessKey",
+          accessKeyId: parameters?.accessKeyId || "localAwsAccessKeyId",
+          secretAccessKey:
+            parameters?.secretAccessKey || "localAwsSecretAccessKey",
         });
   }
 
   return options;
 };
 
-export const initDB = (params?: DynatronDocumentClientParams) =>
-  new DynamoDB(bootstrapDynamoDBOptions(params));
+export const initDB = (parameters?: DynatronDocumentClientParameters) =>
+  new DynamoDB(bootstrapDynamoDBOptions(parameters));
 
-export const initDocumentClient = (params?: DynatronDocumentClientParams) =>
-  new DocumentClient(bootstrapDynamoDBOptions(params));
+export const initDocumentClient = (
+  parameters?: DynatronDocumentClientParameters,
+) => new DocumentClient(bootstrapDynamoDBOptions(parameters));
 
 export class QuickFail {
-  #timeoutReference: NodeJS.Timeout | null = null;
+  #timeoutReference?: NodeJS.Timeout;
   constructor(private duration: number, private error: Error) {}
 
   wait = async (): Promise<never> => {
@@ -161,7 +166,7 @@ export class QuickFail {
   };
 
   cancel = () => {
-    if (this.#timeoutReference == null) {
+    if (this.#timeoutReference == undefined) {
       return;
     }
     clearTimeout(this.#timeoutReference);

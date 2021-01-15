@@ -1,6 +1,5 @@
 import retry from "async-retry";
 import {
-  AttributeMap,
   BatchWriteItemInput,
   BatchWriteItemOutput,
   DocumentClient,
@@ -8,8 +7,8 @@ import {
 } from "aws-sdk/clients/dynamodb";
 
 import {
-  IBatchPutItemRequestItem,
-  RequestParams,
+  IBatchDeleteItemRequestItem,
+  RequestParameters,
   ReturnItemCollectionMetrics,
 } from "../../types/request";
 import {
@@ -20,19 +19,24 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
-import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Requester } from "./_Requester";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
+import {
+  isRetryableDBError,
+  QuickFail,
+  validateKey,
+} from "../utils/misc-utils";
+import { Requester } from "./_requester";
 
-export class BatchPutter extends Requester {
+export class BatchDeleter extends Requester {
   #ReturnItemCollectionMetrics?: ReturnItemCollectionMetrics;
 
   constructor(
     DB: DocumentClient,
     table: string,
-    private items: AttributeMap[],
+    private keys: DocumentClient.Key[],
   ) {
     super(DB, table);
+    keys.forEach((key) => validateKey(key));
   }
 
   returnItemCollectionMetrics = (
@@ -46,52 +50,48 @@ export class BatchPutter extends Requester {
     return {
       ...super[BUILD](),
       ...(this.#ReturnItemCollectionMetrics
-        ? {
-            ReturnItemCollectionMetrics: this.#ReturnItemCollectionMetrics,
-          }
+        ? { ReturnItemCollectionMetrics: this.#ReturnItemCollectionMetrics }
         : {}),
     };
   }
 
   [BUILD_PARAMS]() {
-    let requestParams = super[BUILD_PARAMS]();
+    let requestParameters = super[BUILD_PARAMS]();
 
-    if (this.table == null) {
+    if (this.table == undefined) {
       throw new Error("Table name must be provided");
     }
 
-    if (this.items.length == 0) {
-      throw new Error("At least one item must be provided");
+    if (this.keys.length === 0) {
+      throw new Error("At least one key must be provided");
     }
 
-    const requestItems: IBatchPutItemRequestItem[] = this.items.map((item) => ({
-      PutRequest: { Item: item },
-    }));
-    const batchParams: RequestParams = {
+    const requestItems: IBatchDeleteItemRequestItem[] = this.keys.map(
+      (key) => ({ DeleteRequest: { Key: key } }),
+    );
+    const batchParameters: RequestParameters = {
       RequestItems: { [this.table]: requestItems },
     };
-    requestParams = {
-      ...batchParams,
-      ...(requestParams.ReturnConsumedCapacity
-        ? {
-            ReturnConsumedCapacity: requestParams.ReturnConsumedCapacity,
-          }
+    requestParameters = {
+      ...batchParameters,
+      ...(requestParameters.ReturnConsumedCapacity
+        ? { ReturnConsumedCapacity: requestParameters.ReturnConsumedCapacity }
         : {}),
-      ...(requestParams.ReturnItemCollectionMetrics
+      ...(requestParameters.ReturnItemCollectionMetrics
         ? {
             ReturnItemCollectionMetrics:
-              requestParams.ReturnItemCollectionMetrics,
+              requestParameters.ReturnItemCollectionMetrics,
           }
         : {}),
     };
 
-    return { ...optimizeRequestParams(requestParams) };
+    return { ...optimizeRequestParameters(requestParameters) };
   }
 
-  private batchWriteSegment = async (params: BatchWriteItemInput) => {
+  private batchWriteSegment = async (parameters: BatchWriteItemInput) => {
     const response: BatchWriteItemOutput = {};
 
-    const table = Object.keys(params.RequestItems)[0];
+    const table = Object.keys(parameters.RequestItems)[0];
 
     let operationCompleted = false;
 
@@ -103,11 +103,11 @@ export class BatchPutter extends Requester {
         );
         try {
           const result = await Promise.race([
-            this.DB.batchWrite(params).promise(),
+            this.DB.batchWrite(parameters).promise(),
             qf.wait(),
           ]);
           if (result.UnprocessedItems?.[table]) {
-            params.RequestItems = result.UnprocessedItems;
+            parameters.RequestItems = result.UnprocessedItems;
           } else {
             operationCompleted = true;
           }
@@ -132,12 +132,12 @@ export class BatchPutter extends Requester {
               ];
             }
           }
-        } catch (ex) {
-          if (!isRetryableDBError(ex)) {
-            bail(ex);
+        } catch (error) {
+          if (!isRetryableDBError(error)) {
+            bail(error);
             return;
           }
-          throw ex;
+          throw error;
         } finally {
           qf.cancel();
         }
@@ -149,27 +149,33 @@ export class BatchPutter extends Requester {
   $execute = async <T = ItemList | undefined | null, U extends boolean = false>(
     returnRawResponse?: U,
   ): Promise<U extends true ? BatchWriteItemOutput : T | undefined | null> => {
-    const params = { ...(this[BUILD_PARAMS]() as BatchWriteItemInput) };
-    const table = Object.keys(params.RequestItems)[0];
-    const items = [...params.RequestItems[table]];
-    const paramsGroups: BatchWriteItemInput[] = [];
-    const lighterParams: BatchWriteItemInput = JSON.parse(
-      JSON.stringify(params),
+    const parameters = { ...(this[BUILD_PARAMS]() as BatchWriteItemInput) };
+    const table = Object.keys(parameters.RequestItems)[0];
+    const items = [...parameters.RequestItems[table]];
+    const parametersGroups: BatchWriteItemInput[] = [];
+    const lighterParameters: BatchWriteItemInput = JSON.parse(
+      JSON.stringify(parameters),
     );
-    for (let i = 0; i < items.length; i += BATCH_OPTIONS.WRITE_LIMIT) {
-      paramsGroups.push({
-        ...lighterParams,
+    for (
+      let index = 0;
+      index < items.length;
+      index += BATCH_OPTIONS.WRITE_LIMIT
+    ) {
+      parametersGroups.push({
+        ...lighterParameters,
         RequestItems: {
-          [table]: items.slice(i, i + BATCH_OPTIONS.WRITE_LIMIT),
+          [table]: items.slice(index, index + BATCH_OPTIONS.WRITE_LIMIT),
         },
       });
     }
     const allResults = await Promise.all(
-      paramsGroups.map((paramsGroup) => this.batchWriteSegment(paramsGroup)),
+      parametersGroups.map((parametersGroup) =>
+        this.batchWriteSegment(parametersGroup),
+      ),
     );
 
     const results = allResults.reduce((p, c) => {
-      if (p == null) {
+      if (p == undefined) {
         return c;
       }
 
@@ -195,11 +201,7 @@ export class BatchPutter extends Requester {
       }
       return p;
     });
-    return (returnRawResponse
-      ? results
-      : params.RequestItems[table].map(
-          (input) => input.PutRequest?.Item,
-        )) as any;
+    return (returnRawResponse ? results : undefined) as any;
   };
 
   $ = this.$execute;

@@ -42,7 +42,7 @@ export class TablesLister {
   }
 
   $execute = async () => {
-    const params = { ...(this[BUILD_PARAMS]() as ListTablesInput) };
+    const parameters = { ...(this[BUILD_PARAMS]() as ListTablesInput) };
 
     let operationCompleted = false;
 
@@ -56,13 +56,13 @@ export class TablesLister {
         );
         try {
           const result = await Promise.race([
-            this.DB.listTables(params).promise(),
+            this.DB.listTables(parameters).promise(),
             qf.wait(),
           ]);
-          if (result.LastEvaluatedTableName == null) {
+          if (result.LastEvaluatedTableName == undefined) {
             operationCompleted = true;
           } else {
-            params.ExclusiveStartTableName = result.LastEvaluatedTableName;
+            parameters.ExclusiveStartTableName = result.LastEvaluatedTableName;
           }
           if (result.TableNames) {
             response.TableNames = [
@@ -72,18 +72,21 @@ export class TablesLister {
           }
 
           if (
-            params.Limit &&
-            (response.TableNames?.length || 0) >= params.Limit
+            parameters.Limit &&
+            (response.TableNames?.length || 0) >= parameters.Limit
           ) {
-            response.TableNames = response.TableNames?.slice(0, params.Limit);
+            response.TableNames = response.TableNames?.slice(
+              0,
+              parameters.Limit,
+            );
             operationCompleted = true;
           }
-        } catch (ex) {
-          if (!isRetryableDBError(ex)) {
-            bail(ex);
+        } catch (error) {
+          if (!isRetryableDBError(error)) {
+            bail(error);
             return;
           }
-          throw ex;
+          throw error;
         } finally {
           qf.cancel();
         }

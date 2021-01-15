@@ -13,13 +13,13 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters as optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Mutator } from "./_Mutator";
-import { Checker } from "./Checker";
-import { Deleter } from "./Deleter";
-import { Putter } from "./Putter";
-import { Updater } from "./Updater";
+import { Mutator } from "./_mutator";
+import { Checker } from "./checker";
+import { Deleter } from "./deleter";
+import { Putter } from "./putter";
+import { Updater } from "./updater";
 
 export class TransactWriter extends Mutator {
   #ClientRequestToken?: ClientRequestToken;
@@ -47,7 +47,7 @@ export class TransactWriter extends Mutator {
   }
 
   [BUILD_PARAMS]() {
-    let requestParams = super[BUILD_PARAMS]();
+    let requestParameters = super[BUILD_PARAMS]();
 
     if (this.items.length === 0) {
       throw new Error("At least one transaction must be provided");
@@ -55,13 +55,13 @@ export class TransactWriter extends Mutator {
     if (this.items.length > 25) {
       throw new Error("No more than 25 transactions can be provided");
     }
-    const supportedParamsByAll = [
+    const supportedParametersByAll = new Set([
       "ConditionExpression",
       "TableName",
       "ExpressionAttributeNames",
       "ExpressionAttributeValues",
       "ReturnValues",
-    ];
+    ]);
     const transactWriteActionConfigs = {
       Checker: {
         requestName: "ConditionCheck",
@@ -74,12 +74,12 @@ export class TransactWriter extends Mutator {
         supportedParams: ["Key", "UpdateExpression"],
       },
     };
-    requestParams = {
+    requestParameters = {
       TransactItems: this.items.map((item) => {
         const transactItem = item[BUILD_PARAMS]();
         Object.keys(transactItem).forEach((k) => {
           if (
-            !supportedParamsByAll.includes(k) &&
+            !supportedParametersByAll.has(k) &&
             !transactWriteActionConfigs[
               item.constructor.name
             ].supportedParams.includes(k)
@@ -97,23 +97,23 @@ export class TransactWriter extends Mutator {
             .requestName]: transactItem,
         } as TransactWriteItem;
       }),
-      ...(requestParams.ClientRequestToken
-        ? { ClientRequestToken: requestParams.ClientRequestToken }
+      ...(requestParameters.ClientRequestToken
+        ? { ClientRequestToken: requestParameters.ClientRequestToken }
         : {}),
-      ...(requestParams.ReturnConsumedCapacity
+      ...(requestParameters.ReturnConsumedCapacity
         ? {
-            ReturnConsumedCapacity: requestParams.ReturnConsumedCapacity,
+            ReturnConsumedCapacity: requestParameters.ReturnConsumedCapacity,
           }
         : {}),
-      ...(requestParams.ReturnItemCollectionMetrics
+      ...(requestParameters.ReturnItemCollectionMetrics
         ? {
             ReturnItemCollectionMetrics:
-              requestParams.ReturnItemCollectionMetrics,
+              requestParameters.ReturnItemCollectionMetrics,
           }
         : {}),
     };
 
-    return { ...optimizeRequestParams(requestParams) };
+    return { ...optimizeRequestParameters(requestParameters) };
   }
 
   $execute = async () => {
@@ -130,12 +130,12 @@ export class TransactWriter extends Mutator {
           qf.wait(),
         ]);
         return result;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

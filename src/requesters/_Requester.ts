@@ -1,13 +1,13 @@
 import { DocumentClient } from "aws-sdk/clients/dynamodb";
 
-import { RequestParams, ReturnConsumedCapacity } from "../../types/request";
+import { RequestParameters, ReturnConsumedCapacity } from "../../types/request";
 import { BUILD, BUILD_PARAMS } from "../utils/constants";
 import {
   cleanupEmptyExpressions,
   convertRawConditionExpressions,
   convertRawProjectionExpression,
   convertRawUpdateExpression,
-} from "../utils/request-params-utils";
+} from "../utils/request-parameters-utils";
 
 export class Requester {
   #ReturnConsumedCapacity?: ReturnConsumedCapacity;
@@ -24,7 +24,7 @@ export class Requester {
 
   relaxLatencies = (patienceRatio = 1) => {
     if (patienceRatio <= 0) {
-      throw "The ratio must be positive";
+      throw new Error("The ratio must be positive");
     }
     this.patienceRatio = Math.abs(patienceRatio);
     return this;
@@ -39,16 +39,18 @@ export class Requester {
   }
 
   [BUILD_PARAMS](queryKey?: DocumentClient.Key) {
-    const requestParams: RequestParams = this[BUILD]();
+    const requestParameters: RequestParameters = this[BUILD]();
 
     return cleanupEmptyExpressions(
       convertRawUpdateExpression(
         convertRawConditionExpressions(
           convertRawProjectionExpression(
-            Object.keys(requestParams).reduce(
-              (p: RequestParams, c) => ({
+            Object.keys(requestParameters).reduce(
+              (p: RequestParameters, c) => ({
                 ...p,
-                ...(requestParams[c] != null ? { [c]: requestParams[c] } : {}),
+                ...(requestParameters[c] != undefined
+                  ? { [c]: requestParameters[c] }
+                  : {}),
               }),
               {},
             ),

@@ -14,9 +14,9 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters as optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { MultiGetter } from "./_MultiGetter";
+import { MultiGetter } from "./_multi-getter";
 
 const MIN_TOTAL_SEGMENTS = 1;
 const MAX_TOTAL_SEGMENTS = 1_000_000;
@@ -47,16 +47,19 @@ export class Scanner extends MultiGetter {
     return {
       ...super[BUILD](),
       ...(this.#TotalSegments ? { TotalSegments: this.#TotalSegments } : {}),
-      ...(this.#Segment != null ? { Segment: this.#Segment } : {}),
+      ...(this.#Segment != undefined ? { Segment: this.#Segment } : {}),
     };
   }
 
-  private scanSegment = async (params: ScanInput, disableRecursion = false) => {
+  private scanSegment = async (
+    parameters: ScanInput,
+    disableRecursion = false,
+  ) => {
     let operationCompleted = false;
-    if (params.Segment != null && params.TotalSegments) {
-      params.Segment = Math.min(
-        Math.max(params.Segment, MIN_TOTAL_SEGMENTS - 1),
-        params.TotalSegments - 1,
+    if (parameters.Segment != undefined && parameters.TotalSegments) {
+      parameters.Segment = Math.min(
+        Math.max(parameters.Segment, MIN_TOTAL_SEGMENTS - 1),
+        parameters.TotalSegments - 1,
       );
     }
     const response: ScanOutput = {};
@@ -68,13 +71,13 @@ export class Scanner extends MultiGetter {
         );
         try {
           const result = await Promise.race([
-            this.DB.scan(params).promise(),
+            this.DB.scan(parameters).promise(),
             qf.wait(),
           ]);
-          if (result.LastEvaluatedKey == null || disableRecursion) {
+          if (result.LastEvaluatedKey == undefined || disableRecursion) {
             operationCompleted = true;
           } else {
-            params.ExclusiveStartKey = result.LastEvaluatedKey;
+            parameters.ExclusiveStartKey = result.LastEvaluatedKey;
           }
           if (result.Items) {
             response.Items = [...(response.Items || []), ...result.Items];
@@ -95,20 +98,23 @@ export class Scanner extends MultiGetter {
                 (result.ConsumedCapacity?.CapacityUnits || 0);
             }
           }
-          if (params.Limit && (response.Items?.length || 0) >= params.Limit) {
-            response.Items = response.Items?.slice(0, params.Limit);
+          if (
+            parameters.Limit &&
+            (response.Items?.length || 0) >= parameters.Limit
+          ) {
+            response.Items = response.Items?.slice(0, parameters.Limit);
             response.Count = response.Items?.length || 0;
             operationCompleted = true;
           }
-          if (disableRecursion && result.LastEvaluatedKey != null) {
+          if (disableRecursion && result.LastEvaluatedKey != undefined) {
             response.LastEvaluatedKey = result.LastEvaluatedKey;
           }
-        } catch (ex) {
-          if (!isRetryableDBError(ex)) {
-            bail(ex);
+        } catch (error) {
+          if (!isRetryableDBError(error)) {
+            bail(error);
             return;
           }
-          throw ex;
+          throw error;
         } finally {
           qf.cancel();
         }
@@ -118,11 +124,11 @@ export class Scanner extends MultiGetter {
   };
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS]();
+    const requestParameters = super[BUILD_PARAMS]();
 
     return {
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 
@@ -130,46 +136,50 @@ export class Scanner extends MultiGetter {
     returnRawResponse?: U,
     disableRecursion = false,
   ): Promise<U extends true ? ScanOutput : T | undefined | null> => {
-    const params = { ...(this[BUILD_PARAMS]() as ScanInput) };
-    if (params.IndexName) {
-      delete params.ConsistentRead;
+    const parameters = { ...(this[BUILD_PARAMS]() as ScanInput) };
+    if (parameters.IndexName) {
+      delete parameters.ConsistentRead;
     }
     let initialLimit: number | undefined;
-    if (params.ExclusiveStartKey && !disableRecursion) {
-      delete params.TotalSegments;
-      delete params.Segment;
+    if (parameters.ExclusiveStartKey && !disableRecursion) {
+      delete parameters.TotalSegments;
+      delete parameters.Segment;
     }
-    if (params.TotalSegments) {
-      params.TotalSegments = Math.max(
-        Math.min(params.TotalSegments, MAX_TOTAL_SEGMENTS),
+    if (parameters.TotalSegments) {
+      parameters.TotalSegments = Math.max(
+        Math.min(parameters.TotalSegments, MAX_TOTAL_SEGMENTS),
         MIN_TOTAL_SEGMENTS,
       );
-      if (params.Limit) {
-        const totalSegmentsBasedOnLimit = Math.ceil(params.Limit * 0.2);
-        params.TotalSegments = Math.min(
-          params.TotalSegments,
+      if (parameters.Limit) {
+        const totalSegmentsBasedOnLimit = Math.ceil(parameters.Limit * 0.2);
+        parameters.TotalSegments = Math.min(
+          parameters.TotalSegments,
           totalSegmentsBasedOnLimit,
         );
-        initialLimit = params.Limit;
-        params.Limit = Math.ceil(params.Limit / params.TotalSegments);
+        initialLimit = parameters.Limit;
+        parameters.Limit = Math.ceil(
+          parameters.Limit / parameters.TotalSegments,
+        );
       }
     }
     let responses: (ScanOutput | undefined)[] = [];
-    if (params.Segment != null) {
-      const segmentParams = { ...params };
-      if (!segmentParams.TotalSegments) {
-        segmentParams.TotalSegments = 1;
+    if (parameters.Segment != undefined) {
+      const segmentParameters = { ...parameters };
+      if (!segmentParameters.TotalSegments) {
+        segmentParameters.TotalSegments = 1;
       }
-      responses = [await this.scanSegment(params, disableRecursion)];
+      responses = [await this.scanSegment(parameters, disableRecursion)];
     } else {
       responses = await Promise.all(
-        [...Array(params.TotalSegments || 1).keys()].map(async (segment) => {
-          const segmentParams = { ...params };
-          if (segmentParams.TotalSegments) {
-            segmentParams.Segment = segment;
-          }
-          return this.scanSegment(segmentParams, disableRecursion);
-        }),
+        [...Array.from({ length: parameters.TotalSegments || 1 }).keys()].map(
+          async (segment) => {
+            const segmentParameters = { ...parameters };
+            if (segmentParameters.TotalSegments) {
+              segmentParameters.Segment = segment;
+            }
+            return this.scanSegment(segmentParameters, disableRecursion);
+          },
+        ),
       );
     }
     const consolidatedResponse = responses.reduce((p: ScanOutput, c) => {

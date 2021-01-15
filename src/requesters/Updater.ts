@@ -27,9 +27,9 @@ import {
   SHORT_MAX_LATENCY,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Checker } from "./Checker";
+import { Checker } from "./checker";
 
 export class Updater extends Checker {
   #ConditionExpression?: Condition[];
@@ -201,7 +201,9 @@ export class Updater extends Checker {
             { validate: true },
           )
         : (value as DocumentClient.DynamoDbSet);
-    return setValue == null ? this.remove(path) : this.delete(path, setValue);
+    return setValue == undefined
+      ? this.remove(path)
+      : this.delete(path, setValue);
   }
 
   [BUILD]() {
@@ -219,16 +221,16 @@ export class Updater extends Checker {
   }
 
   [BUILD_PARAMS]() {
-    const requestParams = super[BUILD_PARAMS]();
+    const requestParameters = super[BUILD_PARAMS]();
 
-    if (!requestParams.UpdateExpression) {
+    if (!requestParameters.UpdateExpression) {
       throw new Error("Update request should have at least one update action");
     }
 
     return {
       Key: this.key,
       TableName: this.table,
-      ...optimizeRequestParams(requestParams),
+      ...optimizeRequestParameters(requestParameters),
     };
   }
 
@@ -249,12 +251,12 @@ export class Updater extends Checker {
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Attributes) as any;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

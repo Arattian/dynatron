@@ -1,15 +1,15 @@
 import retry from "async-retry";
-import DynamoDB, { DeleteTableInput } from "aws-sdk/clients/dynamodb";
+import DynamoDB, { DescribeTableInput } from "aws-sdk/clients/dynamodb";
 
 import {
   BUILD_PARAMS,
-  LONG_MAX_LATENCY,
   RETRY_OPTIONS,
+  SHORT_MAX_LATENCY,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../../utils/constants";
 import { isRetryableDBError, QuickFail } from "../../utils/misc-utils";
 
-export class TableDeleter {
+export class TableDescriber {
   constructor(protected readonly DB: DynamoDB, protected table: string) {}
 
   [BUILD_PARAMS]() {
@@ -19,23 +19,23 @@ export class TableDeleter {
   $execute = async () => {
     return retry(async (bail, attempt) => {
       const qf = new QuickFail(
-        attempt * LONG_MAX_LATENCY,
+        attempt * SHORT_MAX_LATENCY,
         new Error(TAKING_TOO_LONG_EXCEPTION),
       );
       try {
         const response = await Promise.race([
-          this.DB.deleteTable(
-            this[BUILD_PARAMS]() as DeleteTableInput,
+          this.DB.describeTable(
+            this[BUILD_PARAMS]() as DescribeTableInput,
           ).promise(),
           qf.wait(),
         ]);
-        return response.TableDescription;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+        return response.Table;
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

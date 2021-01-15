@@ -4,7 +4,7 @@ import {
 } from "aws-sdk/clients/dynamodb";
 import fastEquals from "fast-deep-equal";
 
-import { RequestParams } from "../../types/request";
+import { RequestParameters as RequestParameters } from "../../types/request";
 
 export const optimizeExpression = (
   expression: string,
@@ -15,21 +15,21 @@ export const optimizeExpression = (
   ExpressionAttributeNames: ExpressionAttributeNameMap;
   ExpressionAttributeValues?: ExpressionAttributeValueMap;
 } => {
-  let newExpression = expression;
+  let optimizedExpression = expression;
   const optimizedNames: Record<string, string> = {};
   const optimizedValues: Record<string, any> = {};
 
   Object.keys(attributeNames).forEach((key) => {
-    if (optimizedNames[attributeNames[key]] == null) {
+    if (optimizedNames[attributeNames[key]] == undefined) {
       optimizedNames[attributeNames[key]] = key;
     } else {
-      newExpression = newExpression
+      optimizedExpression = optimizedExpression
         .split(key)
         .join(optimizedNames[attributeNames[key]]);
     }
   });
 
-  if (attributeValues != null) {
+  if (attributeValues != undefined) {
     Object.keys(attributeValues).forEach((key) => {
       const value = attributeValues[key];
 
@@ -38,7 +38,7 @@ export const optimizeExpression = (
       );
 
       if (optimizedKey) {
-        newExpression = newExpression.split(key).join(optimizedKey);
+        optimizedExpression = optimizedExpression.split(key).join(optimizedKey);
       } else {
         optimizedValues[key] = value;
       }
@@ -46,36 +46,38 @@ export const optimizeExpression = (
   }
 
   return {
-    Expression: newExpression,
+    Expression: optimizedExpression,
     ExpressionAttributeNames: Object.keys(optimizedNames).reduce(
       (p, c) => ({ ...p, [optimizedNames[c]]: c }),
       {},
     ),
-    ...(attributeValues != null
+    ...(attributeValues != undefined
       ? { ExpressionAttributeValues: optimizedValues }
       : {}),
   };
 };
 
-export const optimizeRequestParams = (requestParams: RequestParams) => {
+export const optimizeRequestParameters = (
+  requestParameters: RequestParameters,
+) => {
   const expressions = {
-    ConditionExpression: requestParams.ConditionExpression,
-    FilterExpression: requestParams.FilterExpression,
-    KeyConditionExpression: requestParams.KeyConditionExpression,
-    ProjectionExpression: requestParams.ProjectionExpression,
-    UpdateExpression: requestParams.UpdateExpression,
+    ConditionExpression: requestParameters.ConditionExpression,
+    FilterExpression: requestParameters.FilterExpression,
+    KeyConditionExpression: requestParameters.KeyConditionExpression,
+    ProjectionExpression: requestParameters.ProjectionExpression,
+    UpdateExpression: requestParameters.UpdateExpression,
   };
 
   const optimizedNames: Record<string, string> = {};
   const optimizedValues: Record<string, any> = {};
 
   if (
-    requestParams.ExpressionAttributeNames &&
-    Object.keys(requestParams.ExpressionAttributeNames).length > 0
+    requestParameters.ExpressionAttributeNames &&
+    Object.keys(requestParameters.ExpressionAttributeNames).length > 0
   ) {
-    const attributeNames = requestParams.ExpressionAttributeNames;
-    Object.keys(requestParams.ExpressionAttributeNames).forEach((key) => {
-      if (optimizedNames[attributeNames[key]] != null) {
+    const attributeNames = requestParameters.ExpressionAttributeNames;
+    Object.keys(requestParameters.ExpressionAttributeNames).forEach((key) => {
+      if (optimizedNames[attributeNames[key]] != undefined) {
         Object.keys(expressions).forEach((expressionType) => {
           expressions[expressionType] = (expressions[expressionType] || "")
             .split(key)
@@ -86,14 +88,14 @@ export const optimizeRequestParams = (requestParams: RequestParams) => {
       }
     });
 
-    requestParams.ExpressionAttributeNames = optimizedNames;
+    requestParameters.ExpressionAttributeNames = optimizedNames;
   }
 
   if (
-    requestParams.ExpressionAttributeValues &&
-    Object.keys(requestParams.ExpressionAttributeValues).length > 0
+    requestParameters.ExpressionAttributeValues &&
+    Object.keys(requestParameters.ExpressionAttributeValues).length > 0
   ) {
-    const attributeValues = requestParams.ExpressionAttributeValues;
+    const attributeValues = requestParameters.ExpressionAttributeValues;
     Object.keys(attributeValues).forEach((key) => {
       const value = attributeValues[key];
 
@@ -114,67 +116,66 @@ export const optimizeRequestParams = (requestParams: RequestParams) => {
   }
 
   if (Object.keys(optimizedNames).length > 0) {
-    requestParams.ExpressionAttributeNames = Object.keys(optimizedNames).reduce(
-      (p, c) => ({ ...p, [optimizedNames[c]]: c }),
-      {},
-    );
+    requestParameters.ExpressionAttributeNames = Object.keys(
+      optimizedNames,
+    ).reduce((p, c) => ({ ...p, [optimizedNames[c]]: c }), {});
   }
 
   if (Object.keys(optimizedValues).length > 0) {
-    requestParams.ExpressionAttributeValues = optimizedValues;
+    requestParameters.ExpressionAttributeValues = optimizedValues;
   }
 
   Object.keys(expressions).forEach((expressionType) => {
     if (expressions[expressionType]) {
-      requestParams[expressionType] = expressions[expressionType];
+      requestParameters[expressionType] = expressions[expressionType];
     }
   });
 
   // Shorter keys
   if (
-    requestParams.ExpressionAttributeNames &&
-    Object.keys(requestParams.ExpressionAttributeNames).length > 0
+    requestParameters.ExpressionAttributeNames &&
+    Object.keys(requestParameters.ExpressionAttributeNames).length > 0
   ) {
-    const attributeNames = requestParams.ExpressionAttributeNames;
+    const attributeNames = requestParameters.ExpressionAttributeNames;
     const optimizedAttributeNames = {};
     Object.keys(attributeNames).forEach((key, index) => {
-      const newKey = `#n${index}`;
+      const prefixedKey = `#n${index}`;
       Object.keys(expressions).forEach((expressionType) => {
         expressions[expressionType] = (expressions[expressionType] || "")
           .split(key)
-          .join(newKey);
+          .join(prefixedKey);
       });
 
-      optimizedAttributeNames[newKey] = attributeNames[key];
+      optimizedAttributeNames[prefixedKey] = attributeNames[key];
     });
-    requestParams.ExpressionAttributeNames = optimizedAttributeNames;
+    requestParameters.ExpressionAttributeNames = optimizedAttributeNames;
   }
 
   if (
-    requestParams.ExpressionAttributeValues &&
-    Object.keys(requestParams.ExpressionAttributeValues).length > 0
+    requestParameters.ExpressionAttributeValues &&
+    Object.keys(requestParameters.ExpressionAttributeValues).length > 0
   ) {
-    const attributeValues = requestParams.ExpressionAttributeValues;
+    const attributeValues = requestParameters.ExpressionAttributeValues;
     const optimizedAttributeValues = {};
     Object.keys(attributeValues).forEach((key, index) => {
-      const newKey = `:v${index}`;
+      const prefixedKey = `:v${index}`;
       Object.keys(expressions).forEach((expressionType) => {
         expressions[expressionType] = (expressions[expressionType] || "")
           .split(key)
-          .join(newKey);
+          .join(prefixedKey);
       });
 
-      optimizedAttributeValues[newKey] = attributeValues[key];
+      optimizedAttributeValues[prefixedKey] = attributeValues[key];
     });
-    requestParams.ExpressionAttributeValues = optimizedAttributeValues;
+    requestParameters.ExpressionAttributeValues = optimizedAttributeValues;
   }
 
   Object.keys(expressions).forEach((expressionType) => {
     if (!expressions[expressionType]) {
       return;
     }
-    requestParams[expressionType] = expressions[expressionType];
+    requestParameters[expressionType] = expressions[expressionType];
   });
 
-  return requestParams;
+  return requestParameters;
 };

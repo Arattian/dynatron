@@ -33,7 +33,7 @@ export interface IBatchPutItemRequestItem {
   PutRequest: { Item: DocumentClient.PutItemInputAttributeMap };
 }
 
-export interface RequestParams {
+export interface RequestParameters {
   ClientRequestToken?: ClientRequestToken;
   ConditionExpression?: string;
   ConsistentRead?: ConsistentRead;
@@ -106,11 +106,13 @@ interface LocalConnection extends ConnectionTimeout {
   profile?: string;
 }
 
-export type DynatronDocumentClientParams = DirectConnection | LocalConnection;
+export type DynatronDocumentClientParameters =
+  | DirectConnection
+  | LocalConnection;
 
-export interface DynatronConstructorParams {
+export interface DynatronConstructorParameters {
   table: string;
-  clientConfigs?: DynatronDocumentClientParams;
+  clientConfigs?: DynatronDocumentClientParameters;
 }
 
 type AttributeName = {

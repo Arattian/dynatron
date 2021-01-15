@@ -12,7 +12,7 @@ import {
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Checker } from "./Checker";
+import { Checker } from "./checker";
 
 export class Deleter extends Checker {
   $execute = async <
@@ -32,12 +32,12 @@ export class Deleter extends Checker {
           qf.wait(),
         ]);
         return (returnRawResponse ? response : response.Attributes) as any;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }

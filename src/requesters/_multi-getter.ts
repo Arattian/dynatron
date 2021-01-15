@@ -8,7 +8,7 @@ import {
 import { Condition } from "../../types/conditions";
 import { isConditionEmptyDeep } from "../utils/condition-expression-utils";
 import { BUILD } from "../utils/constants";
-import { Requester } from "./_Requester";
+import { Requester } from "./_requester";
 
 export class MultiGetter extends Requester {
   #ConsistentRead?: ConsistentRead;
@@ -23,12 +23,15 @@ export class MultiGetter extends Requester {
     return this;
   };
 
-  select = (...args: (string | string[] | undefined | null)[]) => {
-    if (args.every((arg) => arg == null) || args.flat().length === 0) {
+  select = (...arguments_: (string | string[] | undefined | null)[]) => {
+    if (
+      arguments_.every((argument) => argument == undefined) ||
+      arguments_.flat().length === 0
+    ) {
       return this;
     }
 
-    args.forEach((projection) => {
+    arguments_.forEach((projection) => {
       if (typeof projection === "string") {
         projection = [projection];
       }
@@ -42,12 +45,12 @@ export class MultiGetter extends Requester {
     return this;
   };
 
-  where = (...args: (Condition | Condition[] | undefined | null)[]) => {
-    if (isConditionEmptyDeep(args)) {
+  where = (...arguments_: (Condition | Condition[] | undefined | null)[]) => {
+    if (isConditionEmptyDeep(arguments_)) {
       return this;
     }
-    this.#FilterExpression = args.reduce((p: Condition[], c) => {
-      if (c == null) {
+    this.#FilterExpression = arguments_.reduce((p: Condition[], c) => {
+      if (c == undefined) {
         return p;
       }
       return [...p, ...(Array.isArray(c) ? c : [c])];
@@ -66,7 +69,7 @@ export class MultiGetter extends Requester {
   };
 
   start = (exclusiveStartKey: DocumentClient.Key | null) => {
-    if (exclusiveStartKey != null) {
+    if (exclusiveStartKey != undefined) {
       this.#ExclusiveStartKey = exclusiveStartKey;
     }
     return this;

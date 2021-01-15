@@ -1,6 +1,6 @@
 import { ReturnItemCollectionMetrics } from "../../types/request";
 import { BUILD } from "../utils/constants";
-import { Requester } from "./_Requester";
+import { Requester } from "./_requester";
 
 export class Mutator extends Requester {
   #ReturnItemCollectionMetrics?: ReturnItemCollectionMetrics;

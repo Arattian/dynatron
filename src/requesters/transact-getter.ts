@@ -13,10 +13,10 @@ import {
   RETRY_OPTIONS,
   TAKING_TOO_LONG_EXCEPTION,
 } from "../utils/constants";
-import { optimizeRequestParams } from "../utils/expression-optimization-utils";
+import { optimizeRequestParameters } from "../utils/expression-optimization-utils";
 import { isRetryableDBError, QuickFail } from "../utils/misc-utils";
-import { Requester } from "./_Requester";
-import { Getter } from "./Getter";
+import { Requester } from "./_requester";
+import { Getter } from "./getter";
 
 export class TransactGetter extends Requester {
   constructor(DB: DocumentClient, table: string, private items: Getter[]) {
@@ -24,7 +24,7 @@ export class TransactGetter extends Requester {
   }
 
   [BUILD_PARAMS]() {
-    let requestParams = super[BUILD_PARAMS]();
+    let requestParameters = super[BUILD_PARAMS]();
 
     if (this.items.length === 0) {
       throw new Error("At least one transaction must be provided");
@@ -32,30 +32,30 @@ export class TransactGetter extends Requester {
     if (this.items.length > 25) {
       throw new Error("No more than 25 transactions can be provided");
     }
-    const supportedParams = [
+    const supportedParameters = new Set([
       "Key",
       "TableName",
       "ExpressionAttributeNames",
       "ProjectionExpression",
-    ];
-    requestParams = {
+    ]);
+    requestParameters = {
       TransactItems: this.items.map((item) => {
         const transactItem = item[BUILD_PARAMS]();
         Object.keys(transactItem).forEach((k) => {
-          if (!supportedParams.includes(k)) {
+          if (!supportedParameters.has(k)) {
             delete transactItem[k];
           }
         });
         return { Get: transactItem } as TransactGetItem;
       }),
-      ...(requestParams.ReturnConsumedCapacity
+      ...(requestParameters.ReturnConsumedCapacity
         ? {
-            ReturnConsumedCapacity: requestParams.ReturnConsumedCapacity,
+            ReturnConsumedCapacity: requestParameters.ReturnConsumedCapacity,
           }
         : {}),
     };
 
-    return { ...optimizeRequestParams(requestParams) };
+    return { ...optimizeRequestParameters(requestParameters) };
   }
 
   $execute = async <T = ItemList | undefined | null, U extends boolean = false>(
@@ -78,12 +78,12 @@ export class TransactGetter extends Requester {
         return (returnRawResponse
           ? response
           : response.Responses?.map((r) => r.Item)) as any;
-      } catch (ex) {
-        if (!isRetryableDBError(ex)) {
-          bail(ex);
+      } catch (error) {
+        if (!isRetryableDBError(error)) {
+          bail(error);
           return;
         }
-        throw ex;
+        throw error;
       } finally {
         qf.cancel();
       }
